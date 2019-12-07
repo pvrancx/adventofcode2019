@@ -78,6 +78,7 @@ day_7_test_data_cont = \
 
 @pytest.mark.parametrize("program,expected", day_2_test_data)
 def test_day2(program, expected):
+    """Basic instruction processing"""
     computer = IntComputer(program)
     computer.run()
     np.testing.assert_array_equal(expected, computer.memory)
@@ -85,6 +86,7 @@ def test_day2(program, expected):
 
 @pytest.mark.parametrize("program,inputs,expected_output", day_5_test_data)
 def test_day5(program, inputs, expected_output):
+    """Test input / output processing"""
     computer = IntComputer(program)
     computer.input_stream.append(inputs)
     computer.run(False)
@@ -94,6 +96,7 @@ def test_day5(program, inputs, expected_output):
 
 @pytest.mark.parametrize("program,inputs,expected_output", day_7_test_data_seq)
 def test_day7_seq(program, inputs, expected_output):
+    """Test sequential linking of computers"""
     computers = [IntComputer(program) for _ in range(len(inputs))]
     for idx, cpu in enumerate(computers[1:]):
         cpu.connect_input(computers[idx].output_stream)
@@ -108,6 +111,7 @@ def test_day7_seq(program, inputs, expected_output):
 
 @pytest.mark.parametrize("program,inputs,expected_output", day_7_test_data_cont)
 def test_day7_cont(program, inputs, expected_output):
+    """Test continuous execution of computers in feedback loop"""
     computers = [IntComputer(program) for _ in range(len(inputs))]
     for idx, cpu in enumerate(computers[1:]):
         cpu.connect_input(computers[idx].output_stream)
