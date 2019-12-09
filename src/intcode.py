@@ -8,6 +8,7 @@ import numpy as np
 class ParameterMode(Enum):
     POSITION = 0
     IMMEDIATE = 1
+    RELATIVE = 2
 
 
 class OpCode(Enum):
@@ -21,6 +22,7 @@ class OpCode(Enum):
     JUMP_IF_FALSE = (6, 2, 0)
     LESS_THAN = (7, 2, 1)
     EQUALS = (8, 2, 1)
+    SET_REL_BASE = (9, 1, 0)
 
     def __new__(cls, *args, **kwargs):
         obj = object.__new__(cls)
@@ -42,9 +44,16 @@ class IntComputer:
     def __init__(self, program: np.ndarray):
         self._program = program.copy()
         self._memory_ptr = 0
-        self._memory = program.copy()
+        self._memory = np.zeros(program.size * 2, dtype=np.int64)
+        self._memory[0:program.size] = program[:]
         self._input_stream = deque()
         self._output_stream = deque()
+        self._relative_base = 0
+
+    def _increase_memory(self):
+        tmp = np.zeros(self._memory.size * 2, dtype=np.int64)
+        tmp[0:self._memory.size] = self._memory[:]
+        self._memory = tmp
 
     def _set_mem_ptr(self, idx: int):
         assert -1 <= idx < self._memory.size
@@ -61,7 +70,9 @@ class IntComputer:
         return self._output_stream.append(value)
 
     def _write_memory(self, idx: int, value: int):
-        assert 0 <= idx < self._memory.size
+        assert 0 <= idx
+        while idx > self._memory.size:
+            self._increase_memory()
         self._memory[idx] = value
 
     def _read_memory(self, idx: int, mode: ParameterMode) -> int:
@@ -70,6 +81,8 @@ class IntComputer:
             return self._memory[idx]
         elif mode is ParameterMode.IMMEDIATE:
             return idx
+        elif mode is ParameterMode.RELATIVE:
+            return self._memory[self._relative_base + idx]
         else:
             raise RuntimeError('Unknown parameter mode')
 
@@ -101,6 +114,7 @@ class IntComputer:
 
     def reset(self):
         self._memory_ptr = 0
+        self._memory = np.zeros(self._memory.size, dtype=np.int64)
         self._memory = self._program.copy()
 
     def set_program(self, program: np.ndarray):
@@ -181,6 +195,9 @@ class IntComputer:
             else:
                 self._write_memory(target, 0)
             self._inc_mem_ptr(4)
+        elif opcode == OpCode.SET_REL_BASE:
+            arg1 = args[-1]
+            self._relative_base += arg1
         else:
             raise RuntimeError('Unknown OpCode')
 
