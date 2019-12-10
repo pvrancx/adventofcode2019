@@ -29,7 +29,7 @@ def get_polar_coords(xs: np.ndarray,
 
 
 def num_vis(grid: np.ndarray) -> Tuple[int, int, int]:
-    ys, xs = np.where(grid)
+    ys, xs = np.where(grid)  # rows are ys
     result = np.zeros(ys.size, dtype=int)
     idx = 0
     for x, y in zip(xs,ys):
@@ -43,12 +43,13 @@ def num_vis(grid: np.ndarray) -> Tuple[int, int, int]:
 
 def vaporize(grid: np.ndarray, x0: int, y0: int) -> Tuple[int, int]:
     grid_copy = grid.copy()
+    # make sure we don't consider origin
     grid_copy[y0, x0] = False
     ys, xs = np.where(grid_copy)
     rs, angles = get_polar_coords(xs, ys, x0, y0)
 
     unique_angles = np.unique(angles)
-    angle_idx = np.argmax(unique_angles > -np.pi/2) - 1  # negative x is up
+    angle_idx = np.argmax(unique_angles > -np.pi/2) - 1  # negative y is up
     vaporised = np.zeros_like(rs, dtype=bool)
     num_vaporised = 0
     last_vaporised = ()
