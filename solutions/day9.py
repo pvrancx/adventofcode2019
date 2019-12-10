@@ -10,5 +10,9 @@ if __name__ == '__main__':
         computer.input_stream.append(1)
         computer.run(False)
         print(computer.output_stream)
+        computer.reset()
+        computer.input_stream.append(2)
+        computer.run(False)
+        print(computer.output_stream)
 
     _main()
