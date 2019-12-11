@@ -1,6 +1,6 @@
 from collections import deque
 from enum import Enum
-from typing import Tuple, List
+from typing import Tuple, List, NamedTuple
 
 import numpy as np
 
@@ -9,6 +9,11 @@ class ParameterMode(Enum):
     POSITION = 0
     IMMEDIATE = 1
     RELATIVE = 2
+
+
+class Parameter(NamedTuple):
+    ptr: int
+    mode: ParameterMode
 
 
 class OpCode(Enum):
@@ -22,7 +27,7 @@ class OpCode(Enum):
     JUMP_IF_FALSE = (6, 2, 0)
     LESS_THAN = (7, 2, 1)
     EQUALS = (8, 2, 1)
-    SET_REL_BASE = (9, 1, 0)
+    INC_REL_BASE = (9, 1, 0)
 
     def __new__(cls, *args, **kwargs):
         obj = object.__new__(cls)
@@ -50,17 +55,12 @@ class IntComputer:
         self._output_stream = deque()
         self._relative_base = 0
 
-    def _increase_memory(self):
-        tmp = np.zeros(self._memory.size * 2, dtype=np.int64)
-        tmp[0:self._memory.size] = self._memory[:]
-        self._memory = tmp
-
     def _set_mem_ptr(self, idx: int):
-        assert -1 <= idx < self._memory.size
+        assert -1 <= idx
         self._memory_ptr = idx
 
     def _inc_mem_ptr(self, val: int):
-        assert -1 < self._memory_ptr + val < self._memory.size
+        assert -1 < self._memory_ptr + val
         self._memory_ptr += val
 
     def _consume_input(self):
@@ -69,53 +69,75 @@ class IntComputer:
     def _write_output(self, value: int):
         return self._output_stream.append(value)
 
-    def _write_memory(self, idx: int, value: int):
-        assert 0 <= idx
+    def _increase_memory(self):
+        tmp = np.zeros(self._memory.size * 2, dtype=np.int64)
+        tmp[0:self._memory.size] = self._memory[:]
+        self._memory = tmp
+
+    def _write_memory(self, parameter: Parameter, value: int):
+        mode = parameter.mode
+        assert mode is not ParameterMode.IMMEDIATE
+        assert 0 <= parameter.ptr
+        idx = self._memory[parameter.ptr]
+
+        if mode is ParameterMode.RELATIVE:
+            idx += self._relative_base
+
+        assert idx >= 0
         while idx > self._memory.size:
             self._increase_memory()
+
         self._memory[idx] = value
 
-    def _read_memory(self, idx: int, mode: ParameterMode) -> int:
+    def _read_memory(self, parameter: Parameter) -> int:
+        mode = parameter.mode
+        assert 0 <= parameter.ptr
+        idx = self._memory[parameter.ptr]
         if mode is ParameterMode.POSITION:
-            assert 0 <= idx < self._memory.size
+            assert 0 <= idx
+            while idx > self._memory.size:
+                self._increase_memory()
             return self._memory[idx]
         elif mode is ParameterMode.IMMEDIATE:
             return idx
         elif mode is ParameterMode.RELATIVE:
-            return self._memory[self._relative_base + idx]
+            rel_idx = self._relative_base + idx
+            assert 0 <= rel_idx
+            while rel_idx > self._memory.size:
+                self._increase_memory()
+            return self._memory[rel_idx]
         else:
             raise RuntimeError('Unknown parameter mode')
 
-    def _read_params(self, opcode: OpCode, modes: List[ParameterMode]) -> List[int]:
+    def _read_params(self, opcode: OpCode, modes: List[ParameterMode]) -> List[Parameter]:
         params = []
         idx = self._memory_ptr + 1
-        for param_id in range(opcode.num_params()):
-            code = self._memory[idx + param_id]
+        for param_id in range(opcode.num_params() + opcode.num_outputs()):
+            ptr = idx + param_id
             mode = modes[param_id]
-            params.append(self._read_memory(code, mode))
+            params.append(Parameter(ptr, mode))
         return params
-
-    def _read_target(self, opcode: OpCode) -> int:
-        idx = self._memory_ptr + opcode.num_params() + 1
-        return self._read_memory(idx, ParameterMode.POSITION)
 
     def _parse_next_instruction(self) -> Tuple[OpCode, List[ParameterMode]]:
         instruction = self._memory[self._memory_ptr]
         int_str = str(instruction)
         opcode = OpCode(int(int_str[-2:]))
         param_modes = []
-        for param_id in range(opcode.num_params()):
+        for param_id in range(opcode.num_params() + opcode.num_outputs()):
             idx = -3 - param_id
             if param_id < len(int_str) - 2:
                 param_modes.append(ParameterMode(int(int_str[idx])))
             else:
                 param_modes.append(ParameterMode(0))
+
         return opcode, param_modes
 
     def reset(self):
         self._memory_ptr = 0
-        self._memory = np.zeros(self._memory.size, dtype=np.int64)
-        self._memory = self._program.copy()
+        self._memory = np.zeros_like(self._memory, dtype=np.int64)
+        self._memory[0:self._program.size] = self._program[:]
+        self._relative_base = 0
+        self._output_stream.clear()
 
     def set_program(self, program: np.ndarray):
         self._program = program.copy()
@@ -145,59 +167,67 @@ class IntComputer:
     def has_input(self) -> bool:
         return len(self._input_stream) > 0
 
-    def step(self, opcode: OpCode, args: List[int]):
+    def step(self, opcode: OpCode, args: List[Parameter]):
         if opcode is OpCode.HALT:
             self._set_mem_ptr(-1)
         elif opcode is OpCode.INPUT:
-            target = self._read_target(opcode)
+            target = args[-1]
             arg1 = self._consume_input()
             self._write_memory(target, arg1)
             self._inc_mem_ptr(2)
         elif opcode is OpCode.OUTPUT:
             arg1 = args[-1]
-            self._write_output(arg1)
+            value = self._read_memory(arg1)
+            self._write_output(value)
             self._inc_mem_ptr(2)
         elif opcode is OpCode.ADD:
-            target = self._read_target(opcode)
-            arg1, arg2 = args
-            self._write_memory(target, arg1 + arg2)
+            arg1, arg2, target = args
+            value = self._read_memory(arg1) + self._read_memory(arg2)
+            self._write_memory(target, value)
             self._inc_mem_ptr(4)
         elif opcode is OpCode.MULTIPLY:
-            target = self._read_target(opcode)
-            arg1, arg2 = args
-            self._write_memory(target, arg1 * arg2)
+            arg1, arg2, target = args
+            value = self._read_memory(arg1) * self._read_memory(arg2)
+            self._write_memory(target, value)
             self._inc_mem_ptr(4)
         elif opcode is OpCode.JUMP_IF_TRUE:
             arg1, arg2 = args
-            if arg1 != 0:
-                self._set_mem_ptr(arg2)
+            val1 = self._read_memory(arg1)
+            val2 = self._read_memory(arg2)
+            if val1 != 0:
+                self._set_mem_ptr(val2)
             else:
                 self._inc_mem_ptr(3)
         elif opcode is OpCode.JUMP_IF_FALSE:
             arg1, arg2 = args
-            if arg1 == 0:
-                self._set_mem_ptr(arg2)
+            val1 = self._read_memory(arg1)
+            val2 = self._read_memory(arg2)
+            if val1 == 0:
+                self._set_mem_ptr(val2)
             else:
                 self._inc_mem_ptr(3)
         elif opcode == OpCode.LESS_THAN:
-            target = self._read_target(opcode)
-            arg1, arg2 = args
-            if arg1 < arg2:
+            arg1, arg2, target = args
+            val1 = self._read_memory(arg1)
+            val2 = self._read_memory(arg2)
+            if val1 < val2:
                 self._write_memory(target, 1)
             else:
                 self._write_memory(target, 0)
             self._inc_mem_ptr(4)
         elif opcode == OpCode.EQUALS:
-            target = self._read_target(opcode)
-            arg1, arg2 = args
-            if arg1 == arg2:
+            arg1, arg2, target = args
+            val1 = self._read_memory(arg1)
+            val2 = self._read_memory(arg2)
+            if val1 == val2:
                 self._write_memory(target, 1)
             else:
                 self._write_memory(target, 0)
             self._inc_mem_ptr(4)
-        elif opcode == OpCode.SET_REL_BASE:
-            arg1 = args[-1]
-            self._relative_base += arg1
+        elif opcode == OpCode.INC_REL_BASE:
+            arg = args[-1]
+            self._relative_base += self._read_memory(arg)
+            self._inc_mem_ptr(2)
         else:
             raise RuntimeError('Unknown OpCode')
 
