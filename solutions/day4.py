@@ -24,28 +24,26 @@ def check_seq(digits: np.ndarray) -> bool:
     return seq == 2
 
 
-def check_valid2(lower: int, upper: int) -> int:
-    valid = 0
-    # brute force
-    for n in range(lower, upper+1):
-        digits = get_digits(n)
-        double_digits = check_seq(digits)
-        non_decreasing = np.all(digits[:-1] <= digits[1:])
-        valid += int(double_digits and non_decreasing)
+def part1_filter(n: int) -> bool:
+    digits = get_digits(n)
+    double_digits = check_double(digits)
+    non_decreasing = np.all(digits[:-1] <= digits[1:])
+    return double_digits and non_decreasing
 
-    return valid
+
+def part2_filter(n: int) -> bool:
+    digits = get_digits(n)
+    double_digits = check_seq(digits)
+    non_decreasing = np.all(digits[:-1] <= digits[1:])
+    return double_digits and non_decreasing
+
+
+def check_valid2(lower: int, upper: int) -> int:
+    return len(list(filter(part1_filter, range(lower, upper+1))))
 
 
 def check_valid1(lower: int, upper: int) -> int:
-    valid = 0
-    # brute force
-    for n in range(lower, upper+1):
-        digits = get_digits(n)
-        double_digits = check_double(digits)
-        non_decreasing = np.all(digits[:-1] <= digits[1:])
-        valid += int(double_digits and non_decreasing)
-
-    return valid
+    return len(list(filter(part2_filter, range(lower, upper+1))))
 
 
 if __name__ == '__main__':

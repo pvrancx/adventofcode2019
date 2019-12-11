@@ -81,16 +81,16 @@ def test_day2(program, expected):
     """Basic instruction processing"""
     computer = IntComputer(program)
     computer.run()
-    np.testing.assert_array_equal(expected, computer.memory)
+    np.testing.assert_array_equal(expected, computer.memory[0:expected.size])
 
 
 @pytest.mark.parametrize("program,inputs,expected_output", day_5_test_data)
 def test_day5(program, inputs, expected_output):
     """Test input / output processing"""
     computer = IntComputer(program)
-    computer.input_stream.append(inputs)
+    computer.input_stream.write(inputs)
     computer.run(False)
-    output = computer.output_stream.popleft()
+    output = computer.output_stream.read()
     assert output == expected_output
 
 
@@ -101,11 +101,11 @@ def test_day7_seq(program, inputs, expected_output):
     for idx, cpu in enumerate(computers[1:]):
         cpu.connect_input(computers[idx].output_stream)
     for idx, setting in enumerate(inputs):
-        computers[idx].input_stream.append(setting)
-    computers[0].input_stream.append(0)
+        computers[idx].input_stream.write(setting)
+    computers[0].input_stream.write(0)
     for cpu in computers:
         cpu.run(False)
-    output = computers[-1].output_stream.popleft()
+    output = computers[-1].output_stream.read()
     assert output == expected_output
 
 
@@ -117,13 +117,13 @@ def test_day7_cont(program, inputs, expected_output):
         cpu.connect_input(computers[idx].output_stream)
     computers[0].connect_input(computers[-1].output_stream)
     for idx, setting in enumerate(inputs):
-        computers[idx].input_stream.append(setting)
-    computers[0].input_stream.append(0)
+        computers[idx].input_stream.write(setting)
+    computers[0].input_stream.write(0)
     halted = [cpu.is_halted() for cpu in computers]
     while not np.all(halted):
         for cpu in computers:
             cpu.run(True)
         halted = [cpu.is_halted() for cpu in computers]
 
-    output = computers[-1].output_stream.popleft()
+    output = computers[-1].output_stream.read()
     assert output == expected_output

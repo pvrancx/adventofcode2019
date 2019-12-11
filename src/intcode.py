@@ -1,3 +1,4 @@
+import abc
 from collections import deque
 from enum import Enum
 from typing import Tuple, List, NamedTuple
@@ -45,14 +46,62 @@ class OpCode(Enum):
         return self._nouts
 
 
+class InputDevice(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def read(self) -> int:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def clear(self):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def ready(self) -> bool:
+        raise NotImplementedError()
+
+
+class OutputDevice(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def write(self, msg: int):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def clear(self):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def has_output(self) -> bool:
+        raise NotImplementedError()
+
+
+class IoStream(InputDevice, OutputDevice):
+    def __init__(self):
+        self._stream = deque()
+
+    def write(self, msg: int) -> int:
+        self._stream.append(msg)
+
+    def read(self) -> int:
+        return self._stream.popleft()
+
+    def clear(self):
+        self._stream.clear()
+
+    def ready(self):
+        return len(self._stream) > 0
+
+    def has_output(self):
+        return len(self._stream) > 0
+
+
 class IntComputer:
     def __init__(self, program: np.ndarray):
         self._program = program.copy()
         self._memory_ptr = 0
         self._memory = np.zeros(program.size * 2, dtype=np.int64)
         self._memory[0:program.size] = program[:]
-        self._input_stream = deque()
-        self._output_stream = deque()
+        self._input_stream = IoStream()
+        self._output_stream = IoStream()
         self._relative_base = 0
 
     def _set_mem_ptr(self, idx: int):
@@ -64,10 +113,10 @@ class IntComputer:
         self._memory_ptr += val
 
     def _consume_input(self):
-        return self._input_stream.popleft()
+        return self._input_stream.read()
 
     def _write_output(self, value: int):
-        return self._output_stream.append(value)
+        return self._output_stream.write(value)
 
     def _increase_memory(self):
         tmp = np.zeros(self._memory.size * 2, dtype=np.int64)
@@ -155,17 +204,17 @@ class IntComputer:
     def output_stream(self):
         return self._output_stream
 
-    def connect_input(self, input_stream: deque):
+    def connect_input(self, input_stream: InputDevice):
         self._input_stream = input_stream
 
-    def connect_output(self, output_stream: deque):
+    def connect_output(self, output_stream: OutputDevice):
         self._output_stream = output_stream
 
     def has_output(self) -> bool:
-        return len(self._output_stream) > 0
+        return self.output_stream.has_output()
 
     def has_input(self) -> bool:
-        return len(self._input_stream) > 0
+        return self._input_stream.ready()
 
     def step(self, opcode: OpCode, args: List[Parameter]):
         if opcode is OpCode.HALT:
