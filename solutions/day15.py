@@ -81,6 +81,7 @@ def explore_map(program: np.ndarray, start: Position, find_goal: bool=True) \
     goal_commands = ()
 
     while len(frontier) > 0:
+        # next node to visit and path to node
         goal, commands = frontier.pop()
 
         expanded.add(goal)
@@ -89,8 +90,8 @@ def explore_map(program: np.ndarray, start: Position, find_goal: bool=True) \
         # add path to input
         for command in commands:
             computer.input_stream.write(command.value)
-        output = -1
 
+        output = -1
         while computer.input_stream.ready():
             computer.run(True)
             output = computer.output_stream.read()
