@@ -69,7 +69,7 @@ def determine_quantity(reagent: Reagent, inventory: Dict[str, Reagent]) -> int:
     else:
         available = inventory[reagent.name].quantity
         if reagent.quantity >= available:
-            del inventory[reagent.name]
+            del inventory[reagent.name]  # used entire inventory
             return reagent.quantity - available
         else:
             available -= reagent.quantity
@@ -96,7 +96,7 @@ def get_required_ores(target: Reagent, reactions: Dict[str, Reaction]) -> int:
         num_ores += ores_needed
         reagents_to_produce.extend(reagents_needed)
 
-    return num_ores
+    return num_ores0
 
 
 def get_max_fuel(num_ores: int, reactions: Dict[str, Reaction]) -> int:

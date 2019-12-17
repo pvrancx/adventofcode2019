@@ -3,7 +3,7 @@ import numpy as np
 
 def create_pattern(repitition):
     base = [0, 1, 0, -1]
-    return np.array([i for i in base for _ in range(repitition) ])
+    return np.array([i for i in base for _ in range(repitition)])
 
 
 def conv(base_pattern, signal):
@@ -15,7 +15,8 @@ def conv(base_pattern, signal):
         result.append(np.sum(signal[idx:end]*pattern[:(end-idx)]))
         idx += pattern.size
 
-    return int(str(np.sum(result))[-1])
+    value = np.sum(result)
+    return int(str(value)[-1])
 
 
 def do_phase(signal):
@@ -23,9 +24,8 @@ def do_phase(signal):
 
 
 def fft(signal, n_phases):
-    for _ in range(n_phases):
+    for phase in range(n_phases):
         signal = do_phase(signal)
-        print(signal)
     return signal
 
 
@@ -33,10 +33,28 @@ def str_to_np(txt:str):
     return np.array([int(i) for i in txt])
 
 
+def digits_to_number(digits):
+    return int(''.join(str(i) for i in digits))
+
+
+def compute(signal, offset, n_phases):
+    # solution assumes offset >= len(signal)/2
+    tail = signal[offset:]
+    assert len(tail) < offset  # solution only works for 11111... part of pattern
+    for _ in range(n_phases):
+        tail = np.flip(np.flip(tail).cumsum()) % 10
+    return tail[:8]
+
+
 if __name__ == '__main__':
     def _main():
-        with open('../inputs/day16.txt') as f:
-            inp = f.read()
-        signal = inp.strip()
-        print(fft(str_to_np(signal), 100)[:8])
+        with open("../inputs/day16.txt", "rt") as f:
+            txt = f.read().strip()
+        digits = str_to_np(txt)
+        print(digits_to_number(fft(digits, 100)[:8]))
+        offset = int(txt[:7])
+        fft(digits, 100)
+        print(digits_to_number(compute(digits.tolist()*10000, offset, 100)))
+
+
     _main()
