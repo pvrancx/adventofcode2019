@@ -1,30 +1,28 @@
+from typing import Tuple, Dict, List
+
 import numpy as np
 
 from src.graphs import Graph, Position, dijkstra, Edge, AbstractGraph
 
 
-def valid_pos(pos, grid):
+def valid_pos(pos: Position, grid: np.ndarray) -> bool:
     n_rows, n_cols = grid.shape
     return 0 <= pos.x < n_cols and 0 <= pos.y < n_rows
 
 
-def portal_pos(pos, grid):
+def portal_pos(pos: Position, grid: np.ndarray) -> bool:
     return 65 <= grid[pos.y, pos.x] <= 90
 
 
-def maze_pos(pos, grid):
+def maze_pos(pos: Position, grid: np.ndarray) -> bool:
     return grid[pos.y, pos.x] == ord('.')
 
 
-def horizontal_portal(p1, p2):
-    return p1.y != p2.py and p1.x == p2.x
+def is_portal(grid: np.ndarray) -> np.ndarray:
+    return np.logical_and(grid >= 65, grid <= 90)
 
 
-def vertical_portal(p1, p2):
-    return p1.y == p2.py and p1.x != p2.x
-
-
-def get_neighbours(pos, grid):
+def get_neighbours(pos: Position, grid: np.ndarray) -> List[Position]:
     neighb = [Position(pos.x+1, pos.y),
               Position(pos.x, pos.y+1),
               Position(pos.x-1, pos.y),
@@ -32,12 +30,12 @@ def get_neighbours(pos, grid):
     return [n for n in neighb if valid_pos(n, grid) and maze_pos(n, grid)]
 
 
-def get_portal_id(p1, p2, grid):
+def get_portal_id(p1: Position, p2: Position, grid: np.ndarray) -> str:
     return chr(grid[p1.y, p1.x]) + chr(grid[p2.y, p2.x])
 
 
-def scan_h_portals(grid, portals):
-    for row_id in range(0,grid.shape[0], 2):
+def scan_h_portals(grid, portals) -> Dict[str, Tuple[Position, Position]]:
+    for row_id in range(0, grid.shape[0], 2):
         row = grid[row_id]
         portal_idx = np.where(is_portal(row))[0]
 
@@ -67,7 +65,7 @@ def scan_h_portals(grid, portals):
     return portals
 
 
-def scan_v_portals(grid, portals):
+def scan_v_portals(grid: np.ndarray, portals: Dict) -> Dict[str, Tuple[Position, Position]]:
     for col_id in range(0, grid.shape[1], 2):
         col = grid[:, col_id]
         portal_idx = np.where(is_portal(col))[0]
@@ -103,10 +101,6 @@ def get_portals(grid):
     return scan_v_portals(grid, portals)
 
 
-def is_portal(grid):
-    return np.logical_and(grid >= 65, grid <= 90)
-
-
 def readmap(filename):
     result = []
     with open(filename, 'r') as f:
@@ -115,7 +109,7 @@ def readmap(filename):
     return np.array(result)
 
 
-def build_graph(grid):
+def build_graph(grid: np.ndarray) -> Tuple[Graph, Dict[str, Tuple[Position, Position]]]:
     graph = Graph()
     ys, xs = np.where(grid == ord('.'))
     portals = get_portals(grid)
@@ -144,7 +138,6 @@ class RecursiveGraph(AbstractGraph):
         self.minx, self.miny = np.min(coords, axis=0)
         self.maxx, self.maxy = np.max(coords, axis=0)
 
-
     def _is_outer_portal(self, pos):
         return pos.x == self.minx or \
                pos.x == self.maxx or \
@@ -170,7 +163,7 @@ class RecursiveGraph(AbstractGraph):
         return result
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     def _main():
         grid = readmap('../inputs/day20.txt')
         graph, portals = build_graph(grid)
