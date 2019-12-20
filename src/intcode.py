@@ -93,6 +93,9 @@ class IoStream(InputDevice, OutputDevice):
     def has_output(self):
         return len(self._stream) > 0
 
+    def to_list(self):
+        return list(self._stream)
+
 
 class IntComputer:
     def __init__(self, program: np.ndarray):
@@ -133,7 +136,7 @@ class IntComputer:
             idx += self._relative_base
 
         assert idx >= 0
-        while idx > self._memory.size:
+        while idx >= self._memory.size:
             self._increase_memory()
 
         self._memory[idx] = value
