@@ -1,5 +1,7 @@
+import time
 from typing import Tuple, Dict, List
 
+import imageio
 import numpy as np
 
 from src.graphs import Graph, Position, dijkstra, Edge, AbstractGraph
@@ -163,6 +165,32 @@ class RecursiveGraph(AbstractGraph):
         return result
 
 
+def animate(grid, path):
+    import matplotlib.pyplot as plt
+    import os
+
+    ffpath = os.path.join('C:/', 'Users','peter','Documents','ffmpeg','bin','ffmpeg.exe')
+    print(ffpath)
+    plt.rcParams['animation.ffmpeg_path'] = ffpath
+
+    fig, ax = plt.subplots()
+
+    n_rows, n_cols = grid.shape
+    l_path = len(path)
+    with imageio.get_writer('anim2.mp4', fps=30) as video:
+        for idx, node in enumerate(path):
+            print('%d / %d'%(idx, l_path))
+            level, pos = node
+            state = grid.copy()
+            state[pos.y, pos.x] = 100
+            ax.clear()
+            ax.matshow(state, animated=True)
+            ax.text(n_rows//2, n_cols//2, 'level %d'%level, color='blue')
+            fig.canvas.draw()
+            img =np.array(fig.canvas.renderer.buffer_rgba())
+            video.append_data(img)
+
+
 if __name__ == '__main__':
     def _main():
         grid = readmap('../inputs/day20.txt')
@@ -171,13 +199,16 @@ if __name__ == '__main__':
         start = portals['AA'][0]
         goal = portals['ZZ'][0]
 
-        result = dijkstra(graph, start, lambda n: n == goal)
-        print(result.cost)
+        # result = dijkstra(graph, start, lambda n: n == goal)
+        # print(result.cost)
 
+        start_time = time.time()
         rgraph = RecursiveGraph(graph)
 
         result = dijkstra(rgraph, (0, start), lambda n: n == (0, goal))
         print(result.cost)
+        # animate(grid,result.path)
+        print(time.time() - start_time)
 
     _main()
 

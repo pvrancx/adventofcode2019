@@ -78,7 +78,7 @@ class IoStream(InputDevice, OutputDevice):
     def __init__(self):
         self._stream = deque()
 
-    def write(self, msg: int) -> int:
+    def write(self, msg: int):
         self._stream.append(msg)
 
     def read(self) -> int:
@@ -95,6 +95,9 @@ class IoStream(InputDevice, OutputDevice):
 
     def to_list(self):
         return list(self._stream)
+
+    def __len__(self):
+        return len(self._stream)
 
 
 class IntComputer:
@@ -286,11 +289,14 @@ class IntComputer:
     def is_halted(self) -> bool:
         return self._memory_ptr == -1
 
+    def process_next_instruction(self):
+        opcode, param_modes = self._parse_next_instruction()
+        params = self._read_params(opcode, param_modes)
+        self.step(opcode, params)
+
     def run(self, pause_on_output: bool = True):
         while not self.is_halted():
-            opcode, param_modes = self._parse_next_instruction()
-            params = self._read_params(opcode, param_modes)
-            self.step(opcode, params)
+            self.process_next_instruction()
             if pause_on_output and self.has_output():
                 break
 

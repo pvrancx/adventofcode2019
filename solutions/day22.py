@@ -137,7 +137,7 @@ if __name__ == '__main__':
         # compute index directly
         print(compute_idx(2019, 10007, instr))
 
-        # compute by computing composite operation
+        # compute index by computing composite operation
         coeff, offset = compute_composite(10007, instr)
         print((2019*coeff + offset) % 10007)
 
@@ -146,19 +146,25 @@ if __name__ == '__main__':
         result = ((6850 - offset) * inv) % 10007
         print(result)
 
-        # test repeating shuffle & inv
+        # test repeating shuffle & computing inverse
         deck = Deck(10007)
         for _ in range(19):
             deck = shuffle(deck, instr)
         print(deck.cards()[1234])
         rcoeff, roffset = compute_rep(19, 10007, coeff, offset)
 
+        # part 2
         rinv = egcd(rcoeff, 10007)[1]
         result = ((1234 - roffset) * rinv) % 10007
         print(result)
 
+        # effect of 1 shuffle
         coeff, offset = compute_composite(119315717514047, instr)
+
+        # effect of repeating shuffles
         rcoeff, roffset = compute_rep(101741582076661, 119315717514047, coeff, offset)
+
+        # inverse
         rinv = egcd(rcoeff, 119315717514047)[1]
         result = ((2020 - roffset) * rinv) % 119315717514047
         print(result)
