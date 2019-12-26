@@ -30,7 +30,7 @@ if __name__ == '__main__':
                 inp = input('Command? ')
                 encode_input(inp, computer)
             else:
-                print(outp)
+                print(outp[:-1])
 
     _main()
 

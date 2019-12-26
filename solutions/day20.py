@@ -24,83 +24,16 @@ def is_portal(grid: np.ndarray) -> np.ndarray:
     return np.logical_and(grid >= 65, grid <= 90)
 
 
-def get_neighbours(pos: Position, grid: np.ndarray) -> List[Position]:
-    neighb = [Position(pos.x+1, pos.y),
-              Position(pos.x, pos.y+1),
-              Position(pos.x-1, pos.y),
-              Position(pos.x, pos.y-1)]
-    return [n for n in neighb if valid_pos(n, grid) and maze_pos(n, grid)]
+def get_neighbours(pos: Position, steps: int=1) -> List[Position]:
+    neighb = [Position(pos.x+steps, pos.y),
+              Position(pos.x, pos.y+steps),
+              Position(pos.x-steps, pos.y),
+              Position(pos.x, pos.y-steps)]
+    return neighb
 
 
 def get_portal_id(p1: Position, p2: Position, grid: np.ndarray) -> str:
     return chr(grid[p1.y, p1.x]) + chr(grid[p2.y, p2.x])
-
-
-def scan_h_portals(grid, portals) -> Dict[str, Tuple[Position, Position]]:
-    for row_id in range(0, grid.shape[0], 2):
-        row = grid[row_id]
-        portal_idx = np.where(is_portal(row))[0]
-
-        for col_id in portal_idx:
-            up = Position(col_id, row_id-1)
-            down = Position(col_id, row_id+1)
-            if valid_pos(up, grid) and portal_pos(up, grid):
-                portal_id = get_portal_id(up, Position(col_id, row_id), grid)
-                if valid_pos(down, grid) and maze_pos(down, grid):
-                    portal_entrance = down
-                else:
-                    portal_entrance = Position(col_id, row_id-2)
-                if portal_id in portals:
-                    portals[portal_id].append(portal_entrance)
-                else:
-                    portals[portal_id] = [portal_entrance]
-            elif valid_pos(down, grid) and portal_pos(down, grid):
-                portal_id = get_portal_id(Position(col_id, row_id), down, grid)
-                if valid_pos(up, grid) and maze_pos(up, grid):
-                    portal_entrance = up
-                else:
-                    portal_entrance = Position(col_id, row_id+2)
-                if portal_id in portals:
-                    portals[portal_id].append(portal_entrance)
-                else:
-                    portals[portal_id] = [portal_entrance]
-    return portals
-
-
-def scan_v_portals(grid: np.ndarray, portals: Dict) -> Dict[str, Tuple[Position, Position]]:
-    for col_id in range(0, grid.shape[1], 2):
-        col = grid[:, col_id]
-        portal_idx = np.where(is_portal(col))[0]
-
-        for row_id in portal_idx:
-            left = Position(col_id-1, row_id)
-            right = Position(col_id+1, row_id)
-            if valid_pos(left, grid) and portal_pos(left, grid):
-                portal_id = get_portal_id(left, Position(col_id, row_id), grid)
-                if valid_pos(right, grid) and maze_pos(right, grid):
-                    portal_entrance = right
-                else:
-                    portal_entrance = Position(col_id-2, row_id)
-                if portal_id in portals:
-                    portals[portal_id].append(portal_entrance)
-                else:
-                    portals[portal_id] = [portal_entrance]
-            elif valid_pos(right, grid) and portal_pos(right, grid):
-                portal_id = get_portal_id(Position(col_id, row_id), right, grid)
-                if valid_pos(left, grid) and maze_pos(left, grid):
-                    portal_entrance = left
-                else:
-                    portal_entrance = Position(col_id+2, row_id)
-                if portal_id in portals:
-                    portals[portal_id].append(portal_entrance)
-                else:
-                    portals[portal_id] = [portal_entrance]
-    return portals
-
-
-def get_portals(grid):
-    portals = scan_h_portals(grid, {})
-    return scan_v_portals(grid, portals)
 
 
 def readmap(filename):
@@ -111,19 +44,27 @@ def readmap(filename):
     return np.array(result)
 
 
-def build_graph(grid: np.ndarray) -> Tuple[Graph, Dict[str, Tuple[Position, Position]]]:
+def build_graph(grid: np.ndarray) -> Tuple[Graph, Dict[str, List[Position]]]:
     graph = Graph()
     ys, xs = np.where(grid == ord('.'))
-    portals = get_portals(grid)
+    portals = {}
 
     for x, y in zip(xs, ys):
         pos = Position(x, y)
         graph.add_node(pos)
 
     for pos in graph.get_nodes():
-        neighbours = get_neighbours(pos, grid)
-        for n in neighbours:
-            graph.add_edge(pos, n)
+        neighbours = get_neighbours(pos, steps=1)
+        neighbours_2_steps = get_neighbours(pos, steps=2)
+        for n, n2 in zip(neighbours, neighbours_2_steps):
+            if maze_pos(n, grid):
+                graph.add_edge(pos, n)
+            if portal_pos(n, grid) and portal_pos(n2, grid):
+                label = get_portal_id(n2, n, grid) if n2.y < n.y or n2.x < n.x else get_portal_id(n, n2, grid)
+                if label in portals:
+                    portals[label].append(pos)
+                else:
+                    portals[label] = [pos]
 
     for p_id, route in portals.items():
         if p_id not in ['AA', 'ZZ']:
@@ -167,11 +108,6 @@ class RecursiveGraph(AbstractGraph):
 
 def animate(grid, path):
     import matplotlib.pyplot as plt
-    import os
-
-    ffpath = os.path.join('C:/', 'Users','peter','Documents','ffmpeg','bin','ffmpeg.exe')
-    print(ffpath)
-    plt.rcParams['animation.ffmpeg_path'] = ffpath
 
     fig, ax = plt.subplots()
 
@@ -187,7 +123,7 @@ def animate(grid, path):
             ax.matshow(state, animated=True)
             ax.text(n_rows//2, n_cols//2, 'level %d'%level, color='blue')
             fig.canvas.draw()
-            img =np.array(fig.canvas.renderer.buffer_rgba())
+            img = np.array(fig.canvas.renderer.buffer_rgba())
             video.append_data(img)
 
 
@@ -199,8 +135,8 @@ if __name__ == '__main__':
         start = portals['AA'][0]
         goal = portals['ZZ'][0]
 
-        # result = dijkstra(graph, start, lambda n: n == goal)
-        # print(result.cost)
+        result = dijkstra(graph, start, lambda n: n == goal)
+        print(result.cost)
 
         start_time = time.time()
         rgraph = RecursiveGraph(graph)
